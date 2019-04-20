@@ -2,45 +2,67 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"neuron/nr"
 )
 
 var (
-	XO [3][]float64
+	XO, XO0 [9]float64
+	XA      []float64
 )
 
 func main() {
-	nr.CreateLayer([]int{9, 8, 4, 3})
+	nr.CreateLayer([]int{9, 25, 9})
 	nr.NCorrect = 0.1
-	XOPrepare()
-
-	for x := 0; x < 1000; x++ {
-		e := float64(0)
-		for n := 0; n < 3; n++ {
-			for x := 0; x < 9; x++ {
-				nr.Layers[0][x].Out = XO[n][x]
-			}
-			nr.SetAnswers(XO[n])
-			nr.Calc()
-			e += nr.Layers[3][n].Err * nr.Layers[3][n].Err
+	for x := 0; x < 10000; x++ {
+		XOPrepare()
+		nr.Calc()
+		err := float64(0)
+		for n := 0; n < 9; n++ {
+			err += nr.Layers[2][n].Err * nr.Layers[2][n].Err
 		}
-		fmt.Println(e)
 	}
+	XOPrint()
+	NeuroAnswer()
 }
 
 func XOPrepare() {
-	XO[0] = make([]float64, 9)
-	XO[0][0] = 1
-	XO[0][4] = 1
-	XO[0][8] = 1
+	XO = XO0
+	for x := 0; x < 8; x++ {
+		r := rand.Intn(9)
+		XO[r] = 1
+	}
 
-	XO[1] = make([]float64, 9)
-	XO[1][3] = 1
-	XO[1][4] = 1
-	XO[1][5] = 1
+	for n := 0; n < 9; n++ {
+		nr.Layers[0][n].Out = XO[n]
+	}
 
-	XO[2] = make([]float64, 9)
-	XO[2][2] = 1
-	XO[2][5] = 1
-	XO[2][8] = 1
+	XA = make([]float64, 9)
+
+	for n := 0; n < 9; n++ {
+		if XO[n] == 0 {
+			XA[n] = 1
+		}
+	}
+
+	nr.SetAnswers(XA)
+}
+
+func XOPrint() {
+	for n := 0; n < 9; n++ {
+		if n%3 == 0 {
+			fmt.Println()
+		}
+		fmt.Print(XO[n])
+	}
+}
+
+func NeuroAnswer() {
+	for n := 0; n < 9; n++ {
+		if n%3 == 0 {
+			fmt.Println()
+		}
+		fmt.Printf("%.2f", nr.Layers[2][n].Out)
+	}
+
 }
