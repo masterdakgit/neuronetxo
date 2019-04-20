@@ -29,7 +29,7 @@ type Neuron struct {
 }
 
 func main() {
-	nr.CreateLayer([]int{9, 3, 1})
+	nr.CreateLayer([]int{2, 1})
 
 	for l := range nr.Layers {
 		for n := range nr.Layers[l] {
@@ -48,6 +48,10 @@ func main() {
 		}
 		fmt.Println()
 	}
+
+	nr.CalcWeight()
+	fmt.Println()
+	fmt.Println(nr.Layers[1][0].In)
 
 	/*
 		rand.Seed(time.Now().UnixNano())
@@ -82,12 +86,12 @@ func InputPrepare() {
 func StartWeight() {
 	for x0 := 0; x0 < n0+1; x0++ {
 		for x1 := 0; x1 < n1; x1++ {
-			W0[x0][x1] = float64((rand.Intn(1000) - 500) / 10000)
+			W0[x0][x1] = float64((rand.Intn(1000) - 500) / 1000)
 		}
 	}
 	for x0 := 0; x0 < n1+1; x0++ {
 		for x1 := 0; x1 < n2; x1++ {
-			W1[x0][x1] = float64((rand.Intn(1000) - 500) / 10000)
+			W1[x0][x1] = float64((rand.Intn(1000) - 500) / 1000)
 		}
 	}
 
