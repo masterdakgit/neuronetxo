@@ -9,7 +9,7 @@ var (
 	Layers   [][]Neuron
 	Weight   [][][]float64
 	NCorrect float64
-	Answers  []float64
+	answers  []float64
 )
 
 type Neuron struct {
@@ -89,14 +89,14 @@ func weightChange(NLeft, NRight Neuron) float64 {
 }
 
 func SetAnswers(a []float64) {
-	Answers = make([]float64, len(a))
+	answers = make([]float64, len(a))
 	for n := 0; n < len(a); n++ {
-		Answers[n] = a[n]
+		answers[n] = a[n]
 	}
 }
 
 func answer(n int) float64 {
-	return Answers[n]
+	return answers[n]
 }
 
 func (n *Neuron) Activate() {
