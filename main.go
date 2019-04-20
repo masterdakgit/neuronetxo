@@ -4,16 +4,24 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"time"
+	"neuron/nr"
 )
 
-const nc = 0.1
+const (
+	nc = 0.1
+
+	n0 = 3
+	n1 = 9
+	n2 = 1
+)
 
 var (
-	W    [4]float64
-	X    [4]float64
-	N    Neuron
-	errN [100]float64
+	NS0 [n0 + 1]Neuron
+	NS1 [n1 + 1]Neuron
+	NS2 [n2]Neuron
+
+	W0 [n0 + 1][n1 + 1]float64
+	W1 [n1 + 1][n2 + 1]float64
 )
 
 type Neuron struct {
@@ -21,50 +29,120 @@ type Neuron struct {
 }
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
+	nr.CreateLayer([]int{5, 3, 1})
 
-	X[0] = 0
-	X[1] = 0
-	X[2] = 0
-	X[3] = 1
+	for l := range nr.Layers {
+		for n := range nr.Layers[l] {
+			fmt.Print(nr.Layers[l][n].Out, " ")
+		}
+		fmt.Println()
+	}
 
-	W[0] = 1
-	W[1] = 1
-	W[2] = 1
-	W[3] = 1
+	for w := range nr.Weight {
+		for n := range nr.Weight[w] {
+			for x := range nr.Weight[w][n] {
+				fmt.Printf("%.2f", nr.Weight[w][n][x])
+				fmt.Print(" ")
+			}
+			fmt.Print("| ")
+		}
+		fmt.Println()
+	}
 
-	k := 0
-	n100 := false
+	/*
+		rand.Seed(time.Now().UnixNano())
+		StartWeight()
 
-	for {
-		RandomX()
-		Calculate()
-
-		if k >= 100 {
-			k = 0
-			n100 = true
+		for n := 0; n < 100000; n++{
+			InputPrepare()
+			Calculate()
 		}
 
-		errN[k] = N.err * N.err
-		k++
+		for{
+			InputPrepare()
+			Calculate()
 
-		sn := float64(0)
-		for n := 0; n < 100; n++ {
-			sn += errN[n]
+			fmt.Println(Answer())
+			for n := 0; n < n2; n++{
+				fmt.Print(NS2[n].out, " ")
+			}
 
+
+			s := 0
+			fmt.Scanln(&s)
+		}*/
+}
+
+func InputPrepare() {
+	for x := 0; x < n0; x++ {
+		NS0[x].out = float64(rand.Intn(2))
+	}
+}
+
+func StartWeight() {
+	for x0 := 0; x0 < n0+1; x0++ {
+		for x1 := 0; x1 < n1; x1++ {
+			W0[x0][x1] = float64((rand.Intn(1000) - 500) / 10000)
 		}
-		if n100 && sn < 1 {
-			break
+	}
+	for x0 := 0; x0 < n1+1; x0++ {
+		for x1 := 0; x1 < n2; x1++ {
+			W1[x0][x1] = float64((rand.Intn(1000) - 500) / 10000)
 		}
 	}
 
-	for {
-		RandomX()
-		Calculate()
-		fmt.Println(Answer(), N.out)
-		s := 0
-		fmt.Scanln(&s)
+	NS0[n0].out = 1
+	NS1[n1].out = 1
+
+}
+
+func Calculate() {
+	//Подсчет входов слой NS1
+	for x1 := 0; x1 < n1; x1++ {
+		NS1[x1].in = 0
+		for x0 := 0; x0 < n0+1; x0++ {
+			NS1[x1].in += NS0[x0].out * W0[x0][x1]
+		}
+		NS1[x1].out = Activate(NS1[x1].in)
 	}
+
+	//Подсчет входов слой NS2 и ошибки
+	for x2 := 0; x2 < n2; x2++ {
+		NS2[x2].in = 0
+		for x1 := 0; x1 < n1+1; x1++ {
+			NS2[x2].in += NS1[x1].out * W1[x1][x2]
+		}
+		NS2[x2].out = Activate(NS2[x2].in)
+		NS2[x2].err = Answer() - NS2[x2].out
+	}
+
+	//Подсчет ошибки для слоя NS1
+	for x1 := 0; x1 < n1+1; x1++ {
+		NS1[x1].err = 0
+		for x2 := 0; x2 < n2; x2++ {
+			NS1[x1].err += NS2[x2].err * W1[x1][x2]
+		}
+	}
+
+	Correct()
+}
+
+func Correct() {
+	for x1 := 0; x1 < n1; x1++ {
+		for x0 := 0; x0 < n0+1; x0++ {
+			W0[x0][x1] += WeightChange(NS0[x0], NS1[x1])
+		}
+	}
+	for x1 := 0; x1 < n1+1; x1++ {
+		for x0 := 0; x0 < n2; x0++ {
+			W1[x1][x0] += WeightChange(NS1[x1], NS2[x0])
+		}
+	}
+
+}
+
+func WeightChange(NLeft, NRight Neuron) float64 {
+	return nc * NRight.err * NRight.out * (1 - NRight.out) * NLeft.out
 }
 
 func Activate(x float64) float64 {
@@ -72,31 +150,10 @@ func Activate(x float64) float64 {
 }
 
 func Answer() float64 {
-	sx := float64(0)
-	sx += X[0]
-	sx += X[1]
-	sx += X[2]
-	return sx / 3
-}
-
-func RandomX() {
-	for x := 0; x < 3; x++ {
-		X[x] = float64(rand.Intn(2))
+	a := float64(0)
+	for n := 0; n < n0; n++ {
+		a += NS0[n].out
 	}
-}
 
-func Calculate() {
-	N.in = 0
-	N.in += X[0] * W[0]
-	N.in += X[1] * W[1]
-	N.in += X[2] * W[2]
-	N.in += X[3] * W[3] // Нейрон смещения
-
-	N.out = Activate(N.in)
-	N.err = Answer() - N.out
-
-	W[0] += nc * N.err * X[0] * N.out * (1 - N.out)
-	W[1] += nc * N.err * X[1] * N.out * (1 - N.out)
-	W[2] += nc * N.err * X[2] * N.out * (1 - N.out)
-	W[3] += nc * N.err * X[3] * N.out * (1 - N.out)
+	return a / 3
 }
