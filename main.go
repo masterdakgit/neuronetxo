@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	Period    = 1000000
-	NCorrect  = 0.99
+	Period    = 100000
+	NCorrect  = 0.9
 	NNCorrect = 1
 )
 
@@ -62,6 +62,8 @@ func main() {
 			goto Start
 		}
 
+	StartO:
+
 		XOToOut()
 		nr.Calc()
 		N = O()
@@ -78,7 +80,7 @@ func main() {
 		if s[:1] == "w" {
 			CorrectWin(N)
 			H = 0
-			goto Start
+			goto StartO
 		}
 
 		H++
@@ -107,13 +109,14 @@ func main() {
 
 		if Winer(-1)[:1] == "w" {
 			fmt.Println(N, Nx)
-			fmt.Println("ИИ проиграл.")
+			fmt.Println("Вы победили!")
 			CorrectLose(N, Nx)
 			H = 0
 			goto StartX
 
 		}
 
+	StartO_:
 		XOToOut()
 		nr.Calc()
 
@@ -126,6 +129,7 @@ func main() {
 			CorrectWin(N)
 			H = 0
 			fmt.Println("Победа ИИ:", s)
+			goto StartO_
 		}
 
 		if N == 0 {
