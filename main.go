@@ -2,79 +2,148 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"neuron/nr"
-	"time"
+)
+
+const (
+	Period    = 1000000
+	NCorrect  = 0.99
+	NNCorrect = 1
 )
 
 var (
 	XO, XO0 [9]float64
+	History [4]HistoryPlus
 	XA      []float64
 	Layers  []int
+	H       int
+	Lose    int
+	Byzy    int
+	End     bool
 )
 
+type HistoryPlus struct {
+	H [9]float64
+	N int
+}
+
 func main() {
-	rand.Seed(time.Now().UnixNano())
-	Layers = ([]int{9, 27, 9})
+	//rand.Seed(time.Now().UnixNano())
+	Layers = ([]int{9, 37, 9})
 	nr.CreateLayer(Layers)
-	nr.NCorrect = 0.2
+	nr.NCorrect = NCorrect
 
 	N := 0
-	for n := 0; n < 1000000; n++ {
+	End = false
+	for n := 0; n < Period; n++ {
+		if n%(Period/100) == 0 {
+			fmt.Println(n*100/Period+1, "%", "Поражений:", Lose, "Ошибок:",
+				Byzy, "/", Period/100)
+			Byzy = 0
+			Lose = 0
+		}
+	Start:
 		Nx := X()
+
+		if H >= 4 {
+			H = 0
+			XO = XO0
+			goto Start
+		}
+
+		History[H].H = XO
+
 		if Winer(-1)[:1] == "w" {
 			CorrectLose(N, Nx)
+			Lose++
+			H = 0
+			goto Start
 		}
 
 		XOToOut()
 		nr.Calc()
 		N = O()
 
+		if N == 102 {
+			Lose++
+			H = 0
+			goto Start
+		}
+
+		History[H].N = N
+
 		s := Winer(1)
 		if s[:1] == "w" {
 			CorrectWin(N)
+			H = 0
+			goto Start
 		}
 
+		H++
 	}
+	fmt.Println()
+	End = true
 
+	H = 0
 	XO = XO0
-	for f := 0; f < 100; f++ {
-	Start:
-		Nx := X()
+	for f := 0; f < 1000; f++ {
+	StartX:
+		r := 0
+		fmt.Print("Ваш ход: ")
+		fmt.Scanln(&r)
+		Nx := r
+		XO[r] = -1
 		XOPrint()
+
+		if H >= 4 {
+			H = 0
+			XO = XO0
+			goto StartX
+		}
+
+		History[H].H = XO
+
 		if Winer(-1)[:1] == "w" {
 			fmt.Println(N, Nx)
 			fmt.Println("ИИ проиграл.")
 			CorrectLose(N, Nx)
-			s := ""
-			fmt.Scanln(&s)
-			goto Start
+			H = 0
+			goto StartX
 
 		}
+
 		XOToOut()
 		nr.Calc()
 
 		N := O()
 		s := Winer(1)
+		XOPrint()
 
 		if s[:1] == "w" {
-			XOPrint()
+			//XOPrint()
 			CorrectWin(N)
+			H = 0
 			fmt.Println("Победа ИИ:", s)
-			//fmt.Scanln(&s)
 		}
 
 		if N == 0 {
-			XOPrint()
+			//XOPrint()
 		} else {
 			if N == 101 {
 				fmt.Println("Конец.")
+				H = 0
 			}
 			if N == 102 {
 				fmt.Println("Ошибка: ИИ сходил на занятую клетку.")
-				break
+				H = 0
+				s := ""
+				fmt.Scanln(&s)
 			}
 		}
+		History[H].N = N
+		H++
 	}
 
 }
@@ -89,6 +158,7 @@ func O() int {
 
 	if b {
 		XO = XO0
+		//log.Fatal("Ошибка: ИИ некуда ходить.")
 		return 101
 	}
 
@@ -104,7 +174,9 @@ func O() int {
 	if XO[N] == 0 {
 		XO[N] = 1
 	} else {
+		Byzy++
 		CorrectByzy(N)
+		H = 0
 		return 102
 	}
 	return N
@@ -233,19 +305,77 @@ func CorrectLose(N, Nx int) {
 	nr.SetAnswers(XA)
 	nr.Correct()
 
+	if End {
+		XOPrint()
+		fmt.Println(N, Nx)
+	}
+	for n := H - 1; n >= 0; n-- {
+		XO = History[n].H
+		N = History[n].N
+
+		if End {
+			XOPrint()
+			fmt.Println(N)
+			fmt.Println("-------------------------")
+		}
+
+		XOToOut()
+		nr.Calc()
+		NOld := O()
+
+		if End {
+			XOPrint()
+			fmt.Println(NOld, N)
+			fmt.Printf("%.5f", nr.Layers[len(Layers)-1][N].Out)
+			fmt.Println()
+			for x := 0; x < 9; x++ {
+				fmt.Printf("%.5f", nr.Layers[len(Layers)-1][x].Out)
+				fmt.Print(" ")
+			}
+			fmt.Println()
+		}
+
+		if N == NOld {
+			if End {
+				fmt.Println("Ходит по-старому.")
+				qwe := 0
+				fmt.Scanln(&qwe)
+			}
+
+			XA = make([]float64, 9)
+			for n := 0; n < 9; n++ {
+				XA[n] = nr.Layers[len(Layers)-1][n].Out
+			}
+			XA[N] = 0
+			nr.SetAnswers(XA)
+			nr.NCorrect *= NNCorrect
+			nr.Correct()
+		} else {
+
+			continue
+		}
+	}
+	nr.NCorrect = NCorrect
+
 	//ИИ проиград, начинаем сначала.
 	XO = XO0
 }
 
 func CorrectByzy(N int) {
 	XA = make([]float64, 9)
+	E := true
 	for n := 0; n < 9; n++ {
 		if XO[n] == 0 {
 			XA[n] = 1
+			E = false
 		} else {
 			XA[n] = 0
 		}
 	}
+	if E {
+		log.Fatal("Ошибка: ИИ некуда ходить.")
+	}
+
 	nr.SetAnswers(XA)
 	nr.Correct()
 
