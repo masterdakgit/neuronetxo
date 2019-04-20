@@ -29,7 +29,7 @@ type Neuron struct {
 }
 
 func main() {
-	nr.CreateLayer([]int{5, 3, 1})
+	nr.CreateLayer([]int{9, 3, 1})
 
 	for l := range nr.Layers {
 		for n := range nr.Layers[l] {

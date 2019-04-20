@@ -28,4 +28,6 @@ func startWeight() {
 			Weight[w][l0] = make([]float64, len(Layers[w+1])-1)
 		}
 	}
+
+	Layers[len(Layers)-1] = make([]Neuron, len(Layers[len(Layers)-1])-1)
 }
