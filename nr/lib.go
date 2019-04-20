@@ -53,6 +53,9 @@ func Calc() {
 			}
 		}
 	}
+}
+
+func Correct() {
 	layerError()
 }
 
