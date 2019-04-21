@@ -8,91 +8,170 @@ import (
 )
 
 const (
-	Period    = 100000
-	NCorrect  = 0.3
+	Period    = 1000000
+	NCorrect  = 0.9
 	NNCorrect = 1
 )
 
 var (
 	XO, XO0 [9]float64
-	History [4]HistoryPlus
 	XA      []float64
 	Layers  []int
-	H       int
-	Lose    int
+	N       int
 	Byzy    int
 	End     bool
-	nn0     nr.NeuroNet
+
+	nn0, nn1 GameNeuralNet
 )
 
-type NeuralNet struct {
+type GameNeuralNet struct {
+	nn                       nr.NeuroNet
+	History                  [5]HistoryPlus
+	xo                       float64
+	H                        int
+	Lose, Win, Draw, ErrByzy int
+	LastMove                 int
 }
 
 type HistoryPlus struct {
-	H [9]float64
-	N int
+	XO   [9]float64
+	Move int
 }
 
 func main() {
 	//rand.Seed(time.Now().UnixNano())
 	Layers = ([]int{9, 37, 9})
-	nn0.CreateLayer(Layers)
-	nn0.NCorrect = NCorrect
+	nn0.nn.CreateLayer(Layers)
+	nn0.nn.NCorrect = 0.99
+	nn0.xo = -1
 
-	N := 0
+	Layers = ([]int{9, 37, 9})
+	nn1.nn.CreateLayer(Layers)
+	nn1.nn.NCorrect = 0.9
+	nn1.xo = 1
+
+	Game(&nn0, &nn1)
+
+	fmt.Println(nn0.Win)
+
+	if nn0.Win > nn1.Win {
+		nn0.xo = 1
+		fmt.Println("Игра с ИИ_0:")
+		nn0.GameWithHuman()
+	} else {
+		fmt.Println("Игра с ИИ_1:")
+		nn1.GameWithHuman()
+	}
+}
+
+func Game(gn0, gn1 *GameNeuralNet) {
 	End = false
+
 	for n := 0; n < Period; n++ {
 		if n%(Period/100) == 0 {
-			fmt.Println(n*100/Period+1, "%", "Поражений:", Lose, "Ошибок:",
-				Byzy, "/", Period/100)
-			Byzy = 0
-			Lose = 0
+			fmt.Println()
+			fmt.Println(n*100/Period+1, "%")
+			fmt.Println("ИИ_0  Win:", gn0.Win, " Lose:", gn0.Lose, " Draw:", gn0.Draw,
+				" ErrByzy:", gn0.ErrByzy, "/", Period/100)
+			fmt.Println("ИИ_1  Win:", gn1.Win, " Lose:", gn1.Lose, " Draw:", gn1.Draw,
+				" ErrByzy:", gn1.ErrByzy, "/", Period/100)
+			gn0.ErrByzy = 0
+			gn0.Win = 0
+			gn0.Draw = 0
+			gn0.Lose = 0
+
+			gn1.ErrByzy = 0
+			gn1.Win = 0
+			gn1.Draw = 0
+			gn1.Lose = 0
 		}
-	Start:
-		Nx := X()
+		gn1.GameMove(gn0)
+		gn0.GameMove(gn1)
 
-		if H >= 4 {
-			H = 0
-			XO = XO0
-			goto Start
-		}
-
-		History[H].H = XO
-
-		if Winer(-1)[:1] == "w" {
-			CorrectLose(N, Nx)
-			Lose++
-			H = 0
-			goto Start
-		}
-
-	StartO:
-
-		XOToOut()
-		nn0.Calc()
-		N = O()
-
-		if N == 102 {
-			Lose++
-			H = 0
-			goto Start
-		}
-
-		History[H].N = N
-
-		s := Winer(1)
-		if s[:1] == "w" {
-			CorrectWin(N)
-			H = 0
-			goto StartO
-		}
-
-		H++
 	}
-	fmt.Println()
 	End = true
+}
 
-	H = 0
+func (gn *GameNeuralNet) GameMove(enemy *GameNeuralNet) {
+	gn.XOToOut()
+	gn.nn.Calc()
+	gn.LastMove = gn.Move()
+
+	if enemy.LastMove > 100 {
+		gn.H = 0
+		enemy.H = 0
+		XO = XO0
+		return
+	}
+
+	//Некуда ходить
+	if gn.LastMove == 101 {
+		gn.Draw++
+		enemy.Draw++
+
+		XO = gn.History[gn.H-1].XO
+		enemy.XOToOut()
+		enemy.nn.Calc()
+		enemy.CorrectDraw(enemy.LastMove)
+
+		XO = enemy.History[gn.H-1].XO
+		gn.XOToOut()
+		gn.nn.Calc()
+		gn.CorrectDraw(gn.History[gn.H-1].Move)
+
+		XO = XO0
+		return
+	}
+
+	//Сходил на занятую клетку
+	if gn.LastMove == 102 {
+		gn.ErrByzy++
+		gn.Lose++
+		enemy.Win++
+
+		XO = XO0
+		return
+	}
+
+	gn.History[gn.H].XO = XO
+	gn.History[gn.H].Move = gn.LastMove
+
+	//Если победил
+	if Winer(gn.xo)[:1] == "w" {
+		gn.CorrectWin(gn.LastMove)
+		gn.Win++
+		enemy.Lose++
+		enemy.CorrectLose(enemy.LastMove, gn.LastMove)
+
+		XO = XO0
+		gn.LastMove = 103
+		return
+	}
+
+	//Если проиграл
+	W := float64(0)
+	if gn.xo == 1 {
+		W = -1
+	} else {
+		W = 1
+	}
+	if Winer(W)[:1] == "w" {
+		gn.CorrectLose(gn.LastMove, enemy.LastMove)
+		gn.Lose++
+		enemy.Win++
+		enemy.CorrectWin(enemy.LastMove)
+
+		XO = XO0
+		gn.LastMove = 104
+		return
+	}
+
+	gn.H++
+
+}
+
+func (gn *GameNeuralNet) GameWithHuman() {
+	gn.H = 0
 	XO = XO0
 	for f := 0; f < 1000; f++ {
 	StartX:
@@ -103,35 +182,35 @@ func main() {
 		XO[r] = -1
 		XOPrint()
 
-		if H >= 4 {
-			H = 0
+		if gn.H >= 4 {
+			gn.H = 0
 			XO = XO0
 			goto StartX
 		}
 
-		History[H].H = XO
+		gn.History[gn.H].XO = XO
 
 		if Winer(-1)[:1] == "w" {
 			fmt.Println(N, Nx)
 			fmt.Println("Вы победили!")
-			CorrectLose(N, Nx)
-			H = 0
+			gn.CorrectLose(N, Nx)
+			gn.H = 0
 			goto StartX
 
 		}
 
 	StartO_:
-		XOToOut()
-		nn0.Calc()
+		gn.XOToOut()
+		gn.nn.Calc()
 
-		N := O()
+		N := gn.Move()
 		s := Winer(1)
 		XOPrint()
 
 		if s[:1] == "w" {
 			//XOPrint()
-			CorrectWin(N)
-			H = 0
+			gn.CorrectWin(N)
+			gn.H = 0
 			fmt.Println("Победа ИИ:", s)
 			goto StartO_
 		}
@@ -141,22 +220,22 @@ func main() {
 		} else {
 			if N == 101 {
 				fmt.Println("Конец.")
-				H = 0
+				gn.H = 0
 			}
 			if N == 102 {
 				fmt.Println("Ошибка: ИИ сходил на занятую клетку.")
-				H = 0
+				gn.H = 0
 				s := ""
 				fmt.Scanln(&s)
 			}
 		}
-		History[H].N = N
-		H++
+		gn.History[gn.H].Move = N
+		gn.H++
 	}
 
 }
 
-func O() int {
+func (gn *GameNeuralNet) Move() int {
 	b := true
 	for n := 0; n < 9; n++ {
 		if XO[n] == 0 {
@@ -170,21 +249,55 @@ func O() int {
 		return 101
 	}
 
-	max := float64(0)
+	max0 := float64(0)
+	max1 := float64(0)
+	max2 := float64(0)
 	N := 0
+	N0 := 0
+	N1 := 0
+	N2 := 0
 	for n := 0; n < 9; n++ {
-		if nn0.Layers[len(Layers)-1][n].Out > max {
-			max = nn0.Layers[len(Layers)-1][n].Out
-			N = n
+		if gn.nn.Layers[len(Layers)-1][n].Out > max0 {
+			max2 = max1
+			N2 = N1
+
+			max1 = max0
+			N1 = N0
+
+			max0 = gn.nn.Layers[len(Layers)-1][n].Out
+			N0 = n
+		}
+	}
+
+	N = N0
+	switch rand.Intn(3) {
+	case 0:
+		N = N0
+	case 1:
+		if max1 > 0.5 {
+			N = N1
+		}
+	case 2:
+		if max2 > 0.5 {
+			N = N2
+		}
+	}
+
+	if gn.H == 0 {
+		for {
+			N = rand.Intn(9)
+			if XO[N] == 0 {
+				break
+			}
 		}
 	}
 
 	if XO[N] == 0 {
-		XO[N] = 1
+		XO[N] = gn.xo
 	} else {
 		Byzy++
-		CorrectByzy(N)
-		H = 0
+		gn.CorrectByzy(N)
+		gn.H = 0
 		return 102
 	}
 	return N
@@ -212,9 +325,9 @@ func X() int {
 	}
 	return r
 }
-func XOToOut() {
+func (gn *GameNeuralNet) XOToOut() {
 	for n := 0; n < 9; n++ {
-		nn0.Layers[0][n].Out = XO[n]
+		gn.nn.Layers[0][n].Out = XO[n]
 	}
 }
 
@@ -290,36 +403,41 @@ func Winer(w float64) string {
 	return "--"
 }
 
-func CorrectWin(N int) {
+func (gn *GameNeuralNet) CorrectWin(N int) {
 	XA = make([]float64, 9)
 	for n := 0; n < 9; n++ {
-		XA[n] = nn0.Layers[len(Layers)-1][n].Out
+		XA[n] = gn.nn.Layers[len(Layers)-1][n].Out
 	}
 	XA[N] = 1
-	nn0.SetAnswers(XA)
-	nn0.Correct()
+	gn.nn.SetAnswers(XA)
+	gn.nn.Correct()
 
 	//ИИ победил, начинаем сначала.
 	XO = XO0
 }
 
-func CorrectLose(N, Nx int) {
+func (gn *GameNeuralNet) CorrectLose(N, Nx int) {
 	XA = make([]float64, 9)
 	for n := 0; n < 9; n++ {
-		XA[n] = nn0.Layers[len(Layers)-1][n].Out
+		XA[n] = gn.nn.Layers[len(Layers)-1][n].Out
 	}
 	XA[N] = 0
 	XA[Nx] = 1
-	nn0.SetAnswers(XA)
-	nn0.Correct()
+	gn.nn.SetAnswers(XA)
+	gn.nn.Correct()
 
 	if End {
 		XOPrint()
 		fmt.Println(N, Nx)
 	}
-	for n := H - 1; n >= 0; n-- {
-		XO = History[n].H
-		N = History[n].N
+	for n := gn.H - 1; n >= 0; n-- {
+		XO = gn.History[n].XO
+		N = gn.History[n].Move
+
+		if N > 100 {
+			fmt.Println("Ошибка: ", N)
+			continue
+		}
 
 		if End {
 			XOPrint()
@@ -327,17 +445,17 @@ func CorrectLose(N, Nx int) {
 			fmt.Println("-------------------------")
 		}
 
-		XOToOut()
-		nn0.Calc()
-		NOld := O()
+		gn.XOToOut()
+		gn.nn.Calc()
+		NOld := gn.Move()
 
 		if End {
 			XOPrint()
 			fmt.Println(NOld, N)
-			fmt.Printf("%.5f", nn0.Layers[len(Layers)-1][N].Out)
+			fmt.Printf("%.5f", gn.nn.Layers[len(Layers)-1][N].Out)
 			fmt.Println()
 			for x := 0; x < 9; x++ {
-				fmt.Printf("%.5f", nn0.Layers[len(Layers)-1][x].Out)
+				fmt.Printf("%.5f", gn.nn.Layers[len(Layers)-1][x].Out)
 				fmt.Print(" ")
 			}
 			fmt.Println()
@@ -352,24 +470,24 @@ func CorrectLose(N, Nx int) {
 
 			XA = make([]float64, 9)
 			for n := 0; n < 9; n++ {
-				XA[n] = nn0.Layers[len(Layers)-1][n].Out
+				XA[n] = gn.nn.Layers[len(Layers)-1][n].Out
 			}
 			XA[N] = 0
-			nn0.SetAnswers(XA)
-			nn0.NCorrect *= NNCorrect
-			nn0.Correct()
+			gn.nn.SetAnswers(XA)
+			gn.nn.NCorrect *= NNCorrect
+			gn.nn.Correct()
 		} else {
 
 			continue
 		}
 	}
-	nn0.NCorrect = NCorrect
+	gn.nn.NCorrect = NCorrect
 
 	//ИИ проиград, начинаем сначала.
 	XO = XO0
 }
 
-func CorrectByzy(N int) {
+func (gn *GameNeuralNet) CorrectByzy(N int) {
 	XA = make([]float64, 9)
 	E := true
 	for n := 0; n < 9; n++ {
@@ -384,9 +502,28 @@ func CorrectByzy(N int) {
 		log.Fatal("Ошибка: ИИ некуда ходить.")
 	}
 
-	nn0.SetAnswers(XA)
-	nn0.Correct()
+	gn.nn.SetAnswers(XA)
+	gn.nn.Correct()
 
 	//Сходил на занятую клетку, начинаем сначала.
+	XO = XO0
+}
+
+func (gn *GameNeuralNet) CorrectDraw(N int) {
+	XA = make([]float64, 9)
+	for n := 0; n < 9; n++ {
+		XA[n] = gn.nn.Layers[len(Layers)-1][n].Out
+	}
+
+	/*	XOPrint()
+		fmt.Println(N)
+		r := 0
+		fmt.Scanln(&r)
+	*/
+	XA[N] = 0.5
+	gn.nn.SetAnswers(XA)
+	gn.nn.Correct()
+
+	//Ничья, начинаем сначала.
 	XO = XO0
 }
