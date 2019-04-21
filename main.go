@@ -14,12 +14,13 @@ const (
 )
 
 var (
-	XO, XO0 [9]float64
-	XA      []float64
-	Layers  []int
-	N       int
-	Byzy    int
-	End     bool
+	XO, XO0   [9]float64
+	XA        []float64
+	Layers    []int
+	N         int
+	Byzy      int
+	HumanStep bool
+	End       bool
 
 	nn0, nn1, HumanNet GameNeuralNet
 )
@@ -39,6 +40,7 @@ type HistoryPlus struct {
 }
 
 func main() {
+
 	//rand.Seed(time.Now().UnixNano())
 	Layers = ([]int{9, 37, 9})
 	nn0.nn.CreateLayer(Layers)
@@ -57,18 +59,17 @@ func main() {
 	if nn0.Win > nn1.Win {
 		nn0.xo = 1
 		fmt.Println("Игра с ИИ_0:")
-		HumanNet = nn0
-		nn0.GameWithHuman()
+		HumanNet = nn1
+		GameWithHuman(&HumanNet, &nn0)
 	} else {
 		fmt.Println("Игра с ИИ_1:")
-		HumanNet = nn1
-		nn1.GameWithHuman()
+		HumanNet = nn0
+		GameWithHuman(&HumanNet, &nn1)
 	}
 }
 
 func Game(gn0, gn1 *GameNeuralNet) {
 	End = false
-
 	for n := 0; n < Period; n++ {
 		if n%(Period/100) == 0 {
 			fmt.Println()
@@ -91,23 +92,36 @@ func Game(gn0, gn1 *GameNeuralNet) {
 		gn0.GameMove(gn1)
 
 	}
-	//End = true
+	End = true
 }
 
 func (gn *GameNeuralNet) GameMove(enemy *GameNeuralNet) {
-	gn.XOToOut()
-	gn.nn.Calc()
-	gn.LastMove = gn.Move()
+	if HumanStep {
+		HumanMove()
+	} else {
+		gn.XOToOut()
+		gn.nn.Calc()
+		gn.LastMove = gn.Move()
+	}
 
-	if enemy.LastMove > 100 {
+	if enemy.LastMove > 100 || HumanNet.LastMove > 100 {
+		HumanNet.LastMove = 50
 		gn.H = 0
 		enemy.H = 0
 		XO = XO0
 		return
 	}
 
+	if End {
+		XOPrint()
+	}
+
 	//Некуда ходить
 	if gn.LastMove == 101 {
+		if End {
+			fmt.Println()
+			fmt.Println("Ничья!")
+		}
 		gn.Draw++
 		enemy.Draw++
 
@@ -127,6 +141,11 @@ func (gn *GameNeuralNet) GameMove(enemy *GameNeuralNet) {
 
 	//Сходил на занятую клетку
 	if gn.LastMove == 102 {
+		if End {
+			fmt.Println()
+			fmt.Println("Ошибка: ИИ сходил на занятую клетку.")
+		}
+
 		gn.ErrByzy++
 		gn.Lose++
 		enemy.Win++
@@ -140,6 +159,15 @@ func (gn *GameNeuralNet) GameMove(enemy *GameNeuralNet) {
 
 	//Если победил
 	if Winer(gn.xo)[:1] == "w" {
+		if End {
+			fmt.Println()
+			if HumanStep {
+				fmt.Println("Вы победили!")
+			} else {
+				fmt.Println("ИИ победил, Вы проиграли.")
+			}
+		}
+
 		gn.CorrectWin(gn.LastMove)
 		gn.Win++
 		enemy.Lose++
@@ -158,6 +186,14 @@ func (gn *GameNeuralNet) GameMove(enemy *GameNeuralNet) {
 		W = 1
 	}
 	if Winer(W)[:1] == "w" {
+		if End {
+			fmt.Println()
+			if HumanStep {
+				fmt.Println("ИИ победил, Вы проиграли.")
+			} else {
+				fmt.Println("Вы победили!")
+			}
+		}
 		gn.CorrectLose(gn.LastMove, enemy.LastMove)
 		gn.Lose++
 		enemy.Win++
@@ -371,7 +407,9 @@ func (gn *GameNeuralNet) CorrectLose(N, Nx int) {
 	gn.nn.SetAnswers(XA)
 	gn.nn.Correct()
 
-	if End {
+	EndH := false
+
+	if EndH {
 		XOPrint()
 		fmt.Println(N, Nx)
 	}
@@ -384,7 +422,7 @@ func (gn *GameNeuralNet) CorrectLose(N, Nx int) {
 			continue
 		}
 
-		if End {
+		if EndH {
 			XOPrint()
 			fmt.Println(N)
 			fmt.Println("-------------------------")
@@ -394,7 +432,7 @@ func (gn *GameNeuralNet) CorrectLose(N, Nx int) {
 		gn.nn.Calc()
 		NOld := gn.Move()
 
-		if End {
+		if EndH {
 			XOPrint()
 			fmt.Println(NOld, N)
 			fmt.Printf("%.5f", gn.nn.Layers[len(Layers)-1][N].Out)
@@ -407,7 +445,7 @@ func (gn *GameNeuralNet) CorrectLose(N, Nx int) {
 		}
 
 		if N == NOld {
-			if End {
+			if EndH {
 				fmt.Println("Ходит по-старому.")
 				qwe := 0
 				fmt.Scanln(&qwe)
@@ -473,13 +511,7 @@ func (gn *GameNeuralNet) CorrectDraw(N int) {
 	XO = XO0
 }
 
-func HumanMove(II *GameNeuralNet) {
-	if Winer(1)[:1] == "w" {
-		fmt.Println("ИИ победил, Вы проиграли.")
-		HumanNet.LastMove = 204
-		return
-	}
-
+func HumanMove() {
 	NoMove := true
 	for n := 0; n < 9; n++ {
 		if XO[n] == 0 {
@@ -487,9 +519,10 @@ func HumanMove(II *GameNeuralNet) {
 			break
 		}
 	}
+
 	if NoMove {
-		fmt.Println("Ничья.")
-		HumanNet.LastMove = 200
+		fmt.Print("Ничья.")
+		HumanNet.LastMove = 203
 		return
 	}
 
@@ -512,114 +545,18 @@ func HumanMove(II *GameNeuralNet) {
 
 	XO[r] = -1
 	HumanNet.LastMove = r
-	HumanNet.H++
-
-	if Winer(-1)[:1] == "w" {
-		fmt.Println("Вы победили!")
-		HumanNet.LastMove = 203
-		return
-	}
-
 }
 
-func (gn *GameNeuralNet) GameWithHuman() {
+func GameWithHuman(gnHum, gnII *GameNeuralNet) {
 	XO = XO0
-	HumanNet.H = 0
-	gn.H = 0
+	gnHum.H = 0
+	gnII.H = 0
 
 	for {
-		HumanMove(gn)
-		if HumanNet.LastMove > 100 {
-			XO = XO0
-			HumanNet.H = 0
-			gn.H = 0
-		} else {
-			XOPrint()
-		}
+		HumanStep = true
+		gnHum.GameMove(gnII)
 
-		gn.GameMoveVSHuman(&HumanNet)
-
-		if gn.LastMove > 100 {
-			XO = XO0
-			HumanNet.H = 0
-			gn.H = 0
-		} else {
-			XOPrint()
-		}
+		HumanStep = false
+		gnII.GameMove(gnHum)
 	}
-}
-
-func (gn *GameNeuralNet) GameMoveVSHuman(enemy *GameNeuralNet) {
-	gn.XOToOut()
-	gn.nn.Calc()
-	gn.LastMove = gn.Move()
-
-	//Некуда ходить
-	if gn.LastMove == 101 {
-		fmt.Println("ИИ некуда ходить.")
-		gn.Draw++
-		enemy.Draw++
-
-		XO = gn.History[gn.H-1].XO
-		enemy.XOToOut()
-		enemy.nn.Calc()
-		enemy.CorrectDraw(enemy.LastMove)
-
-		XO = enemy.History[gn.H-1].XO
-		gn.XOToOut()
-		gn.nn.Calc()
-		gn.CorrectDraw(gn.History[gn.H-1].Move)
-
-		XO = XO0
-		return
-	}
-
-	//Сходил на занятую клетку
-	if gn.LastMove == 102 {
-		fmt.Println("ИИ сходил на занятую клетку.")
-		gn.ErrByzy++
-		gn.Lose++
-		enemy.Win++
-
-		XO = XO0
-		return
-	}
-
-	gn.History[gn.H].XO = XO
-	gn.History[gn.H].Move = gn.LastMove
-
-	//Если победил
-	if Winer(gn.xo)[:1] == "w" {
-		fmt.Println("ИИ победил, Вы проиграли.")
-		gn.CorrectWin(gn.LastMove)
-		gn.Win++
-		enemy.Lose++
-		enemy.CorrectLose(enemy.LastMove, gn.LastMove)
-
-		XO = XO0
-		gn.LastMove = 103
-		return
-	}
-
-	//Если проиграл
-	W := float64(0)
-	if gn.xo == 1 {
-		W = -1
-	} else {
-		W = 1
-	}
-	if Winer(W)[:1] == "w" {
-		fmt.Println("Вы победили!")
-		gn.CorrectLose(gn.LastMove, enemy.LastMove)
-		gn.Lose++
-		enemy.Win++
-		enemy.CorrectWin(enemy.LastMove)
-
-		XO = XO0
-		gn.LastMove = 104
-		return
-	}
-
-	gn.H++
-
 }

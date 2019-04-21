@@ -16,6 +16,11 @@ type Neuron struct {
 	In, Out, Err float64
 }
 
+type Output struct {
+	Out float64
+	N   int
+}
+
 func (nn *NeuroNet) CreateLayer(L []int) {
 	nn.NCorrect = 0.3
 	nn.Layers = make([][]Neuron, len(L))
@@ -104,4 +109,28 @@ func (nn *NeuroNet) answer(n int) float64 {
 
 func (n *Neuron) Activate() {
 	n.Out = 1 / (1 + math.Exp(-n.In))
+}
+
+func (nn *NeuroNet) SortOutput() []Output {
+	Out := make([]Output, len(nn.Layers[len(nn.Layers)-1])-1)
+
+	for n := 0; n < len(Out); n++ {
+		Out[n].Out = nn.Layers[len(nn.Layers)-1][n].Out
+		Out[n].N = n
+	}
+
+	for n := 0; n < len(Out)-1; n++ {
+		for m := n; m < len(Out); m++ {
+			if Out[n].Out < Out[m].Out {
+				O := Out[m].Out
+				N := Out[m].N
+				Out[m].Out = Out[n].Out
+				Out[m].N = Out[n].N
+				Out[n].Out = O
+				Out[n].N = N
+			}
+		}
+	}
+
+	return Out
 }
