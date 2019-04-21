@@ -5,12 +5,14 @@ import (
 	"log"
 	"math/rand"
 	"neuron/nr"
+	"time"
 )
 
 const (
-	Period    = 100000
+	Period    = 1000000
 	NCorrect  = 0.9
 	NNCorrect = 1
+	NBots     = 2
 )
 
 var (
@@ -22,7 +24,8 @@ var (
 	HumanStep bool
 	End       bool
 
-	nn0, nn1, HumanNet GameNeuralNet
+	HumanNet GameNeuralNet
+	bn       [NBots]GameNeuralNet
 )
 
 type GameNeuralNet struct {
@@ -41,31 +44,40 @@ type HistoryPlus struct {
 
 func main() {
 
-	//rand.Seed(time.Now().UnixNano())
+	rand.Seed(time.Now().UnixNano())
 	Layers = ([]int{9, 37, 9})
-	nn0.nn.CreateLayer(Layers)
-	nn0.nn.NCorrect = 0.7
-	nn0.xo = -1
-
-	Layers = ([]int{9, 37, 9})
-	nn1.nn.CreateLayer(Layers)
-	nn1.nn.NCorrect = 0.9
-	nn1.xo = 1
-
-	Game(&nn0, &nn1)
-
-	fmt.Println(nn0.Win)
-
-	if nn0.Win > nn1.Win {
-		nn0.xo = 1
-		fmt.Println("Игра с ИИ_0:")
-		HumanNet = nn1
-		GameWithHuman(&HumanNet, &nn0)
-	} else {
-		fmt.Println("Игра с ИИ_1:")
-		HumanNet = nn0
-		GameWithHuman(&HumanNet, &nn1)
+	for n := 0; n < len(bn); n++ {
+		bn[n].nn.CreateLayer(Layers)
+		bn[n].nn.NCorrect = 0.15
 	}
+
+	for n0 := 0; n0 < len(bn)-1; n0++ {
+		for n1 := n0 + 1; n1 < len(bn); n1++ {
+			bn[n0].xo = 1
+			bn[n1].xo = -1
+			XO = XO0
+			bn[n0].H = 0
+			bn[n1].H = 0
+			Game(&bn[n0], &bn[n1])
+			fmt.Println(100*(n1+n0*(NBots-1))/((NBots-1)*(NBots-1)), "%")
+		}
+	}
+
+	maxWin := 0
+	NWiner := 0
+	for n := 0; n < len(bn); n++ {
+		if maxWin < bn[n].Win {
+			maxWin = bn[n].Win
+			NWiner = n
+		}
+	}
+
+	fmt.Println("Победил бот N", NWiner, "набрав", maxWin, "побед.")
+
+	HumanNet = bn[0]
+	HumanNet.xo = -1
+	bn[NWiner].xo = 1
+	GameWithHuman(&HumanNet, &bn[NWiner])
 }
 
 func Game(gn0, gn1 *GameNeuralNet) {
@@ -78,6 +90,16 @@ func Game(gn0, gn1 *GameNeuralNet) {
 				" ErrByzy:", gn0.ErrByzy, "/", Period/100)
 			fmt.Println("ИИ_1  Win:", gn1.Win, " Lose:", gn1.Lose, " Draw:", gn1.Draw,
 				" ErrByzy:", gn1.ErrByzy, "/", Period/100)
+
+			//fmt.Println("ИИ0 ErrByzy:", gn0.ErrByzy, "/", Period/5)
+			//fmt.Println("ИИ1 ErrByzy:", gn1.ErrByzy, "/", Period/5)
+			if n > 0 && (gn0.Win+gn1.Win) == 0 {
+				break
+			}
+
+			//	gn0.ErrByzy = 0
+			//	gn1.ErrByzy = 0
+
 			gn0.ErrByzy = 0
 			gn0.Win = 0
 			gn0.Draw = 0
@@ -87,6 +109,7 @@ func Game(gn0, gn1 *GameNeuralNet) {
 			gn1.Win = 0
 			gn1.Draw = 0
 			gn1.Lose = 0
+
 		}
 		gn1.GameMove(gn0)
 		gn0.GameMove(gn1)
@@ -114,6 +137,9 @@ func (gn *GameNeuralNet) GameMove(enemy *GameNeuralNet) {
 
 	if End {
 		XOPrint()
+		if !HumanStep {
+			gn.PrintOut()
+		}
 	}
 
 	//Некуда ходить
@@ -222,55 +248,11 @@ func (gn *GameNeuralNet) Move() int {
 		return 101
 	}
 
-	max0 := float64(0)
-	max1 := float64(0)
-	max2 := float64(0)
-	N := 0
-	N0 := 0
-	N1 := 0
-	N2 := 0
-	for n := 0; n < 9; n++ {
-		if gn.nn.Layers[len(Layers)-1][n].Out > max2 {
-			max2 = max1
-			N2 = N1
+	N := gn.nn.SortOutput()[0].N
 
-			max1 = max0
-			N1 = N0
-
-			max0 = gn.nn.Layers[len(Layers)-1][n].Out
-			N0 = n
-		}
-	}
-
-	max0 = float64(0)
-	for n := 0; n < 9; n++ {
-		if gn.nn.Layers[len(Layers)-1][n].Out > max0 {
-			max0 = gn.nn.Layers[len(Layers)-1][n].Out
-			N0 = n
-		}
-	}
-
-	N = N0
-	switch rand.Intn(3) {
-	case 0:
-		N = N0
-	case 1:
-		if max1 > 0.5 {
-			N = N1
-		}
-	case 2:
-		if max2 > 0.5 {
-			N = N2
-		}
-	}
-
-	if gn.H == 0 {
-		for {
-			N = rand.Intn(9)
-			if XO[N] == 0 && gn.nn.Layers[len(Layers)-1][N].Out > 0.3 {
-				break
-			}
-		}
+	if gn.H == 0 && XO == XO0 {
+		r := rand.Intn(9)
+		N = r
 	}
 
 	if XO[N] == 0 {
@@ -559,4 +541,15 @@ func GameWithHuman(gnHum, gnII *GameNeuralNet) {
 		HumanStep = false
 		gnII.GameMove(gnHum)
 	}
+}
+
+func (gn *GameNeuralNet) PrintOut() {
+	for n := 0; n < 9; n++ {
+		fmt.Print(gn.nn.SortOutput()[n].N, " - ")
+		fmt.Printf("%.3f", gn.nn.SortOutput()[n].Out)
+		if n < 8 {
+			fmt.Print(", ")
+		}
+	}
+	fmt.Println()
 }
