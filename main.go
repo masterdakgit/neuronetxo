@@ -9,7 +9,7 @@ import (
 
 const (
 	Period    = 100000
-	NCorrect  = 0.9
+	NCorrect  = 0.3
 	NNCorrect = 1
 )
 
@@ -22,7 +22,11 @@ var (
 	Lose    int
 	Byzy    int
 	End     bool
+	nn0     nr.NeuroNet
 )
+
+type NeuralNet struct {
+}
 
 type HistoryPlus struct {
 	H [9]float64
@@ -32,8 +36,8 @@ type HistoryPlus struct {
 func main() {
 	//rand.Seed(time.Now().UnixNano())
 	Layers = ([]int{9, 37, 9})
-	nr.CreateLayer(Layers)
-	nr.NCorrect = NCorrect
+	nn0.CreateLayer(Layers)
+	nn0.NCorrect = NCorrect
 
 	N := 0
 	End = false
@@ -65,7 +69,7 @@ func main() {
 	StartO:
 
 		XOToOut()
-		nr.Calc()
+		nn0.Calc()
 		N = O()
 
 		if N == 102 {
@@ -118,7 +122,7 @@ func main() {
 
 	StartO_:
 		XOToOut()
-		nr.Calc()
+		nn0.Calc()
 
 		N := O()
 		s := Winer(1)
@@ -169,8 +173,8 @@ func O() int {
 	max := float64(0)
 	N := 0
 	for n := 0; n < 9; n++ {
-		if nr.Layers[len(Layers)-1][n].Out > max {
-			max = nr.Layers[len(Layers)-1][n].Out
+		if nn0.Layers[len(Layers)-1][n].Out > max {
+			max = nn0.Layers[len(Layers)-1][n].Out
 			N = n
 		}
 	}
@@ -210,7 +214,7 @@ func X() int {
 }
 func XOToOut() {
 	for n := 0; n < 9; n++ {
-		nr.Layers[0][n].Out = XO[n]
+		nn0.Layers[0][n].Out = XO[n]
 	}
 }
 
@@ -289,11 +293,11 @@ func Winer(w float64) string {
 func CorrectWin(N int) {
 	XA = make([]float64, 9)
 	for n := 0; n < 9; n++ {
-		XA[n] = nr.Layers[len(Layers)-1][n].Out
+		XA[n] = nn0.Layers[len(Layers)-1][n].Out
 	}
 	XA[N] = 1
-	nr.SetAnswers(XA)
-	nr.Correct()
+	nn0.SetAnswers(XA)
+	nn0.Correct()
 
 	//ИИ победил, начинаем сначала.
 	XO = XO0
@@ -302,12 +306,12 @@ func CorrectWin(N int) {
 func CorrectLose(N, Nx int) {
 	XA = make([]float64, 9)
 	for n := 0; n < 9; n++ {
-		XA[n] = nr.Layers[len(Layers)-1][n].Out
+		XA[n] = nn0.Layers[len(Layers)-1][n].Out
 	}
 	XA[N] = 0
 	XA[Nx] = 1
-	nr.SetAnswers(XA)
-	nr.Correct()
+	nn0.SetAnswers(XA)
+	nn0.Correct()
 
 	if End {
 		XOPrint()
@@ -324,16 +328,16 @@ func CorrectLose(N, Nx int) {
 		}
 
 		XOToOut()
-		nr.Calc()
+		nn0.Calc()
 		NOld := O()
 
 		if End {
 			XOPrint()
 			fmt.Println(NOld, N)
-			fmt.Printf("%.5f", nr.Layers[len(Layers)-1][N].Out)
+			fmt.Printf("%.5f", nn0.Layers[len(Layers)-1][N].Out)
 			fmt.Println()
 			for x := 0; x < 9; x++ {
-				fmt.Printf("%.5f", nr.Layers[len(Layers)-1][x].Out)
+				fmt.Printf("%.5f", nn0.Layers[len(Layers)-1][x].Out)
 				fmt.Print(" ")
 			}
 			fmt.Println()
@@ -348,18 +352,18 @@ func CorrectLose(N, Nx int) {
 
 			XA = make([]float64, 9)
 			for n := 0; n < 9; n++ {
-				XA[n] = nr.Layers[len(Layers)-1][n].Out
+				XA[n] = nn0.Layers[len(Layers)-1][n].Out
 			}
 			XA[N] = 0
-			nr.SetAnswers(XA)
-			nr.NCorrect *= NNCorrect
-			nr.Correct()
+			nn0.SetAnswers(XA)
+			nn0.NCorrect *= NNCorrect
+			nn0.Correct()
 		} else {
 
 			continue
 		}
 	}
-	nr.NCorrect = NCorrect
+	nn0.NCorrect = NCorrect
 
 	//ИИ проиград, начинаем сначала.
 	XO = XO0
@@ -380,8 +384,8 @@ func CorrectByzy(N int) {
 		log.Fatal("Ошибка: ИИ некуда ходить.")
 	}
 
-	nr.SetAnswers(XA)
-	nr.Correct()
+	nn0.SetAnswers(XA)
+	nn0.Correct()
 
 	//Сходил на занятую клетку, начинаем сначала.
 	XO = XO0
