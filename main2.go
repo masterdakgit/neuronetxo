@@ -20,7 +20,7 @@ var (
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	Layers = ([]int{9, 37, 9})
+	Layers = ([]int{9, 81, 9})
 	Bots[0].NeuralNet.CreateLayer(Layers)
 	Bots[0].NeuralNet.NCorrect = NCorrect
 
