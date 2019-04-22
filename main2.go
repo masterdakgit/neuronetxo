@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	. "neuron/xo"
+	"time"
 )
 
 const (
@@ -17,6 +19,7 @@ var (
 )
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	Layers = ([]int{9, 37, 9})
 	Bots[0].NeuralNet.CreateLayer(Layers)
 	Bots[0].NeuralNet.NCorrect = NCorrect
@@ -25,11 +28,16 @@ func main() {
 	Bots[1].NeuralNet.NCorrect = NCorrect
 
 	fmt.Println("Обучение нейросети N1:")
+	fmt.Println()
 	LearnMove(0)
+	fmt.Println()
 	LearGameLevel0(0)
 
+	fmt.Println()
 	fmt.Println("Обучение нейросети N2:")
+	fmt.Println()
 	LearnMove(1)
+	fmt.Println()
 	LearGameLevel0(1)
 
 	for {
@@ -146,7 +154,7 @@ func LearGameLevel0(bot int) {
 		}
 		fmt.Println("Ошибок:", Byzy, " Поражений:", Lose, " Побед:", Win, " Ничьих:", Draw, "/", LearPeriod)
 
-		if Byzy == 0 && Lose == 0 {
+		if Byzy < 10 && Lose < 100 {
 			break
 		}
 	}
