@@ -152,9 +152,10 @@ func LearGameLevel0(bot int) {
 			}
 			XO = XO0
 		}
-		fmt.Println("Ошибок:", Byzy, " Поражений:", Lose, " Побед:", Win, " Ничьих:", Draw, "/", LearPeriod)
+		fmt.Println(g, "- Ошибок:", Byzy, " Поражений:", Lose, " Побед:", Win, " Ничьих:", Draw, "/", LearPeriod)
 
-		if Byzy < 10 && Lose < 100 {
+		if (bot == 0 && Byzy < 10 && Lose < 100) ||
+			(bot == 1 && Byzy < 10 && Lose < 30) {
 			break
 		}
 	}
