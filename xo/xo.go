@@ -7,11 +7,6 @@ import (
 	"neuron/nr"
 )
 
-const (
-	NCorrect = 0.15
-	NBots    = 1
-)
-
 var (
 	XO, XO0 [9]float64
 	XA      []float64
@@ -25,7 +20,8 @@ type HistoryMove struct {
 
 type Bot struct {
 	NeuralNet nr.NeuroNet
-	History   HistoryMove
+	History   [5]HistoryMove
+	NHistory  int
 }
 
 func RandomMove() int {
@@ -188,6 +184,13 @@ func (bot *Bot) CorrectLoseLevel0(B, R int) {
 	XA[R] = 1
 	bot.NeuralNet.SetAnswers(XA)
 	bot.NeuralNet.Correct()
+}
+
+func (bot *Bot) ShowHistory() {
+	for n := 0; n < bot.NHistory; n++ {
+		XO = bot.History[n].XO
+		PrintXO()
+	}
 }
 
 func Results(res int) string {

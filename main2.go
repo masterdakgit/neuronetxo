@@ -5,7 +5,11 @@ import (
 	. "neuron/xo"
 )
 
-const LearPeriod = 10000
+const (
+	NCorrect   = 0.15
+	NBots      = 2
+	LearPeriod = 10000
+)
 
 var (
 	Bots       [NBots]Bot
@@ -13,76 +17,103 @@ var (
 )
 
 func main() {
-	Layers = ([]int{9, 37, 9})
+	Layers = ([]int{9, 72, 9})
 	Bots[0].NeuralNet.CreateLayer(Layers)
 	Bots[0].NeuralNet.NCorrect = NCorrect
-	fmt.Println("Обучение нейросети:")
-	LearnMove()
-	LearGameLevel0()
-	HumanGame()
-}
 
-func HumanGame() {
-	var Step int
+	Bots[1].NeuralNet.CreateLayer(Layers)
+	Bots[1].NeuralNet.NCorrect = NCorrect
+
+	fmt.Println("Обучение нейросети N1:")
+	LearnMove(0)
+	LearGameLevel0(0)
+
+	fmt.Println("Обучение нейросети N2:")
+	LearnMove(1)
+	LearGameLevel0(1)
+
 	for {
-		fmt.Println()
-		var r, b int
-		for {
-			fmt.Print("Ваш ход (введите номер клетки от 0 до 8): ")
-			fmt.Scanln(&r)
-			Step = GameStep(r, -1)
-			PrintXO()
-			if Step != 0 {
-				break
-			}
-			b = Bots[0].Move()
-			Step = GameStep(b, 1)
-			PrintXO()
-			if Step != 0 {
-				break
-			}
-		}
-		fmt.Println(Results(Step))
-		if Step == 201 {
-			Bots[0].CorrectByzy()
-			Byzy++
-		}
-		if Step == 1 {
-			Bots[0].CorrectLoseLevel0(b, r)
-			Lose++
-		}
-
-		XO = XO0
-
+		HumanOneGame(0)
+		HumanOneGame(1)
 	}
 }
 
-func LearGameLevel0() {
+func HumanOneGame(bot int) {
+	var Step int
+
+	fmt.Println()
+	var r, b int
+
+	if bot%2 == 1 {
+		r = RandomMove()
+		Step = GameStep(r, 1)
+		PrintXO()
+	}
+
+	for {
+		fmt.Print("Ваш ход (введите номер клетки от 0 до 8): ")
+		fmt.Scanln(&r)
+		Step = GameStep(r, -1)
+		PrintXO()
+		if Step != 0 {
+			break
+		}
+		b = Bots[bot].Move()
+		Step = GameStep(b, 1)
+		PrintXO()
+		if Step != 0 {
+			break
+		}
+	}
+	fmt.Println(Results(Step))
+	if Step == 201 {
+		Bots[bot].CorrectByzy()
+		Byzy++
+	}
+	if Step == 1 {
+		Bots[bot].CorrectLoseLevel0(b, r)
+		Lose++
+	}
+
+	XO = XO0
+}
+
+func LearGameLevel0(bot int) {
 	for {
 		Byzy = 0
 		Lose = 0
 		Step := 0
 		for n := 0; n < LearPeriod; n++ {
 			var r, b int
+
+			if bot%2 == 1 {
+				r = RandomMove()
+				Step = GameStep(r, 1)
+			}
+
 			for {
 				r = RandomMove()
 				Step = GameStep(r, -1)
 				if Step != 0 {
 					break
 				}
-				b = Bots[0].Move()
+				b = Bots[bot].Move()
 				Step = GameStep(b, 1)
 				if Step != 0 {
 					break
 				}
 			}
 			if Step == 201 {
-				Bots[0].CorrectByzy()
+				Bots[bot].CorrectByzy()
 				Byzy++
 			}
 			if Step == 1 {
-				Bots[0].CorrectLoseLevel0(b, r)
+				Bots[bot].CorrectLoseLevel0(b, r)
 				Lose++
+			}
+
+			if Step == 2 {
+				Bots[bot].CorrectWin(b, r)
 			}
 
 			XO = XO0
@@ -95,7 +126,7 @@ func LearGameLevel0() {
 
 }
 
-func LearnMove() {
+func LearnMove(bot int) {
 	for {
 		Byzy = 0
 		for n := 0; n < 1000; n++ {
@@ -105,10 +136,10 @@ func LearnMove() {
 				if Step != 0 {
 					break
 				}
-				b := Bots[0].Move()
+				b := Bots[bot].Move()
 				Step = GameStep(b, 1)
 				if Step == 201 {
-					Bots[0].CorrectByzy()
+					Bots[bot].CorrectByzy()
 					Byzy++
 				}
 				if Step != 0 {
