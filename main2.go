@@ -12,12 +12,12 @@ const (
 )
 
 var (
-	Bots       [NBots]Bot
-	Byzy, Lose int
+	Bots                  [NBots]Bot
+	Byzy, Lose, Win, Draw int
 )
 
 func main() {
-	Layers = ([]int{9, 72, 9})
+	Layers = ([]int{9, 37, 9})
 	Bots[0].NeuralNet.CreateLayer(Layers)
 	Bots[0].NeuralNet.NCorrect = NCorrect
 
@@ -71,7 +71,7 @@ func HumanOneGame(bot int) {
 		Byzy++
 	}
 	if Step == 1 {
-		Bots[bot].CorrectLoseLevel0(b, r)
+		Bots[bot].CorrectLose(b, r)
 		Lose++
 	}
 
@@ -79,12 +79,15 @@ func HumanOneGame(bot int) {
 }
 
 func LearGameLevel0(bot int) {
-	for {
+	for g := 0; g < 100; g++ {
 		Byzy = 0
 		Lose = 0
+		Win = 0
+		Draw = 0
 		Step := 0
 		for n := 0; n < LearPeriod; n++ {
 			var r, b int
+			Bots[bot].NHistory = 0
 
 			if bot%2 == 1 {
 				r = RandomMove()
@@ -97,28 +100,52 @@ func LearGameLevel0(bot int) {
 				if Step != 0 {
 					break
 				}
+
 				b = Bots[bot].Move()
 				Step = GameStep(b, 1)
 				if Step != 0 {
 					break
 				}
+
+				Bots[bot].History[Bots[bot].NHistory].XO = XO
+				Bots[bot].History[Bots[bot].NHistory].Move = b
+				Bots[bot].History[Bots[bot].NHistory].EnemyMove = r
+				Bots[bot].NHistory++
 			}
 			if Step == 201 {
 				Bots[bot].CorrectByzy()
 				Byzy++
 			}
 			if Step == 1 {
-				Bots[bot].CorrectLoseLevel0(b, r)
+				Bots[bot].CorrectLose(b, r)
+
+				fLose := float64(Lose + LearPeriod/100)
+				fN := float64(n)
+				if 0.05 > fLose/fN {
+					B := Bots[bot].History[0].Move
+					XO = Bots[bot].History[0].XO
+					XO[B] = 0
+					Bots[bot].Move()
+					R := RandomMove()
+					if XO[4] == 0 {
+						R = 4
+					}
+					Bots[bot].CorrectLose(B, R)
+				}
+
 				Lose++
 			}
-
 			if Step == 2 {
-				Bots[bot].CorrectWin(b, r)
+				Bots[bot].CorrectWin(b)
+				Win++
 			}
-
+			if Step == 3 {
+				Draw++
+			}
 			XO = XO0
 		}
-		fmt.Println("Ошибок", Byzy, "и поражений", Lose, "на", LearPeriod)
+		fmt.Println("Ошибок:", Byzy, " Поражений:", Lose, " Побед:", Win, " Ничьих:", Draw, "/", LearPeriod)
+
 		if Byzy == 0 && Lose == 0 {
 			break
 		}
@@ -153,5 +180,4 @@ func LearnMove(bot int) {
 			break
 		}
 	}
-
 }

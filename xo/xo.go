@@ -14,8 +14,9 @@ var (
 )
 
 type HistoryMove struct {
-	XO   [9]float64
-	Move int
+	XO        [9]float64
+	Move      int
+	EnemyMove int
 }
 
 type Bot struct {
@@ -175,13 +176,23 @@ func (bot *Bot) CorrectByzy() {
 	bot.NeuralNet.Correct()
 }
 
-func (bot *Bot) CorrectLoseLevel0(B, R int) {
+func (bot *Bot) CorrectLose(B, R int) {
 	XA = make([]float64, 9)
 	for n := 0; n < 9; n++ {
 		XA[n] = bot.NeuralNet.Layers[len(Layers)-1][n].Out
 	}
 	XA[B] = 0
 	XA[R] = 1
+	bot.NeuralNet.SetAnswers(XA)
+	bot.NeuralNet.Correct()
+}
+
+func (bot *Bot) CorrectWin(B int) {
+	XA = make([]float64, 9)
+	for n := 0; n < 9; n++ {
+		XA[n] = bot.NeuralNet.Layers[len(Layers)-1][n].Out
+	}
+	XA[B] = 1
 	bot.NeuralNet.SetAnswers(XA)
 	bot.NeuralNet.Correct()
 }
