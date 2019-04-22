@@ -111,6 +111,18 @@ func (n *Neuron) Activate() {
 	n.Out = 1 / (1 + math.Exp(-n.In))
 }
 
+func (nn *NeuroNet) MaxOutputNumber() int {
+	max := float64(0)
+	result := 0
+	for n := 0; n < len(nn.Layers[len(nn.Layers)-1])-1; n++ {
+		if max < nn.Layers[len(nn.Layers)-1][n].Out {
+			max = nn.Layers[len(nn.Layers)-1][n].Out
+			result = n
+		}
+	}
+	return result
+}
+
 func (nn *NeuroNet) SortOutput() []output {
 	Out := make([]output, len(nn.Layers[len(nn.Layers)-1])-1)
 

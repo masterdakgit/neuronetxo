@@ -1,44 +1,126 @@
 package main
 
 import (
-	"math/rand"
-	"neuron/nr"
+	"fmt"
 	. "neuron/xo"
 )
 
-var (
-	Bots [NBots]Bot
-)
+const LearPeriod = 10000
 
-type Bot struct {
-	NeuralNet nr.NeuroNet
-	History   HistoryMove
-}
+var (
+	Bots       [NBots]Bot
+	Byzy, Lose int
+)
 
 func main() {
 	Layers = ([]int{9, 37, 9})
 	Bots[0].NeuralNet.CreateLayer(Layers)
 	Bots[0].NeuralNet.NCorrect = NCorrect
+	fmt.Println("Обучение нейросети:")
+	LearnMove()
+	LearGameLevel0()
+	HumanGame()
+}
+
+func HumanGame() {
+	var Step int
+	for {
+		fmt.Println()
+		var r, b int
+		for {
+			fmt.Print("Ваш ход (введите номер клетки от 0 до 8): ")
+			fmt.Scanln(&r)
+			Step = GameStep(r, -1)
+			PrintXO()
+			if Step != 0 {
+				break
+			}
+			b = Bots[0].Move()
+			Step = GameStep(b, 1)
+			PrintXO()
+			if Step != 0 {
+				break
+			}
+		}
+		fmt.Println(Results(Step))
+		if Step == 201 {
+			Bots[0].CorrectByzy()
+			Byzy++
+		}
+		if Step == 1 {
+			Bots[0].CorrectLoseLevel0(b, r)
+			Lose++
+		}
+
+		XO = XO0
+
+	}
+}
+
+func LearGameLevel0() {
+	for {
+		Byzy = 0
+		Lose = 0
+		Step := 0
+		for n := 0; n < LearPeriod; n++ {
+			var r, b int
+			for {
+				r = RandomMove()
+				Step = GameStep(r, -1)
+				if Step != 0 {
+					break
+				}
+				b = Bots[0].Move()
+				Step = GameStep(b, 1)
+				if Step != 0 {
+					break
+				}
+			}
+			if Step == 201 {
+				Bots[0].CorrectByzy()
+				Byzy++
+			}
+			if Step == 1 {
+				Bots[0].CorrectLoseLevel0(b, r)
+				Lose++
+			}
+
+			XO = XO0
+		}
+		fmt.Println("Ошибок", Byzy, "и поражений", Lose, "на", LearPeriod)
+		if Byzy == 0 && Lose == 0 {
+			break
+		}
+	}
 
 }
 
-func RandomStep() (move int, ret string) {
-	NoMove := true
-	for n := 0; n < 9; n++ {
-		if XO[n] == 0 {
-			NoMove = false
-		}
-	}
-	if NoMove {
-		return 101, "Нет свободных клеток."
-	}
-	r := rand.Intn(9)
+func LearnMove() {
 	for {
-		if XO[r] == 0 {
-			XO[r] = -1
+		Byzy = 0
+		for n := 0; n < 1000; n++ {
+			for {
+				r := RandomMove()
+				Step := GameStep(r, -1)
+				if Step != 0 {
+					break
+				}
+				b := Bots[0].Move()
+				Step = GameStep(b, 1)
+				if Step == 201 {
+					Bots[0].CorrectByzy()
+					Byzy++
+				}
+				if Step != 0 {
+					break
+				}
+			}
+			XO = XO0
+		}
+		fmt.Println("Ошибок", Byzy, "на", LearPeriod)
+		if Byzy == 0 {
 			break
 		}
-		r = (r + 1) % 9
 	}
-	return r, "Случайный ход."
+
 }
