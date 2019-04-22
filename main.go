@@ -10,7 +10,7 @@ import (
 
 const (
 	Period    = 1000000
-	NCorrect  = 0.9
+	NCorrect  = 0.15
 	NNCorrect = 1
 	NBots     = 2
 )
