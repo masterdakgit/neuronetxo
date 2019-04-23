@@ -268,6 +268,18 @@ func (g *GameField) CorrectWin(bot *Bot) {
 	g.XA[bot.LastMove] = 1
 	bot.NeuralNet.SetAnswers(g.XA)
 	bot.NeuralNet.Correct()
+	bot.Win++
+}
+
+func (g *GameField) CorrectDraw(bot *Bot) {
+	g.XA = make([]float64, 9)
+	for n := 0; n < 9; n++ {
+		g.XA[n] = bot.NeuralNet.Layers[len(g.Layers)-1][n].Out
+	}
+	g.XA[bot.LastMove] = 0.5
+	bot.NeuralNet.SetAnswers(g.XA)
+	bot.NeuralNet.Correct()
+	bot.Draw++
 }
 
 func (g *GameField) Correcting(my, enymy *Bot) {
@@ -276,9 +288,14 @@ func (g *GameField) Correcting(my, enymy *Bot) {
 	}
 	if g.StepRes == 1 {
 		g.CorrectLose(enymy, my)
+		g.CorrectWin(my)
 	}
 	if g.StepRes == 2 {
 		g.CorrectLose(enymy, my)
+		g.CorrectWin(my)
+	}
+	if g.StepRes == 3 {
+		g.CorrectDraw(my)
 	}
 }
 
