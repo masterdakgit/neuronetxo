@@ -17,24 +17,20 @@ var (
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	g.Prepare([]int{9, 36, 9}, DefCorrect)
+	g.Prepare([]int{9, 36, 36, 36, 9}, DefCorrect)
 
 	for {
 		for n := 0; n < 10000; n++ {
 			g.Step()
 		}
-		fmt.Println(g.OBot.Byzy, g.XBot.Byzy)
-		if g.XBot.Byzy == 0 && g.OBot.Byzy == 0 {
+		fmt.Println("Byzy:", g.OBot.Byzy, g.XBot.Byzy, "Lose:", g.OBot.Lose, g.XBot.Lose)
+		if g.XBot.Lose == 0 && g.OBot.Lose == 0 {
 			break
 		}
 		g.XBot.Byzy = 0
+		g.XBot.Lose = 0
 		g.OBot.Byzy = 0
-	}
-
-	for n := 0; n < 10; n++ {
-		g.Step()
-		fmt.Println(Results(g.StepRes))
-		g.PrintXO()
+		g.OBot.Lose = 0
 	}
 
 }
