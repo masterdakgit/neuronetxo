@@ -16,7 +16,7 @@ type Neuron struct {
 	In, Out, Err float64
 }
 
-type output struct {
+type Output struct {
 	Out float64
 	N   int
 }
@@ -123,8 +123,18 @@ func (nn *NeuroNet) MaxOutputNumber() int {
 	return result
 }
 
-func (nn *NeuroNet) SortOutput() []output {
-	Out := make([]output, len(nn.Layers[len(nn.Layers)-1])-1)
+func (nn *NeuroNet) MaxOutputFloat() float64 {
+	max := float64(0)
+	for n := 0; n < len(nn.Layers[len(nn.Layers)-1])-1; n++ {
+		if max < nn.Layers[len(nn.Layers)-1][n].Out {
+			max = nn.Layers[len(nn.Layers)-1][n].Out
+		}
+	}
+	return max
+}
+
+func (nn *NeuroNet) SortOutput() []Output {
+	Out := make([]Output, len(nn.Layers[len(nn.Layers)-1])-1)
 
 	for n := 0; n < len(Out); n++ {
 		Out[n].Out = nn.Layers[len(nn.Layers)-1][n].Out
