@@ -88,7 +88,7 @@ func (g *GameField) NoMove() bool {
 
 func (g *GameField) MoveHuman() {
 	r := 0
-	fmt.Print("Ваш ход: ")
+	fmt.Print("Ваш ход (введите номер клетки от 0 до 8): ")
 	fmt.Scanln(&r)
 	g.Human.LastMove = r
 	g.step(&g.Human)
@@ -319,7 +319,7 @@ func (g *GameField) CorrectLose(bot *Bot) {
 
 func (g *GameField) CorrectWin(bot *Bot) {
 	g.XA = make([]float64, 1)
-	g.XA[0] = 0.51
+	g.XA[0] = 1
 
 	for h := g.OBot.core % 2; h <= g.NStep; h += 2 {
 		for n := 0; n < 9; n++ {
