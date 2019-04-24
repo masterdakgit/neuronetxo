@@ -39,9 +39,10 @@ type Bot struct {
 	Lose, Win, Byzy, Draw int
 	LastMove              int
 	xo                    float64
+	core                  int
 }
 
-func (game *GameField) Prepare(L []int, defCorrect float64) {
+func (game *GameField) Prepare(L []int, defCorrect float64, core int) {
 	game.Layers = L
 
 	game.XBot.NeuralNet.CreateLayer(L)
@@ -55,6 +56,7 @@ func (game *GameField) Prepare(L []int, defCorrect float64) {
 	game.OBot.NeuralNet.CreateLayer(L)
 	game.OBot.NeuralNet.NCorrect = defCorrect
 	game.OBot.xo = oo
+	game.OBot.core = core
 
 }
 
@@ -99,7 +101,13 @@ func (g *GameField) StepHuman() {
 		g.XO = XO0
 	}
 
-	if g.NStep%2 == 1 {
+	if g.NStep%2 == g.OBot.core%2 && g.NStep == 0 {
+		g.RandomMove(&g.OBot)
+		g.NStep++
+		return
+	}
+
+	if g.NStep%2 == g.OBot.core%2 {
 		g.Move(&g.OBot)
 		if g.StepRes != 0 {
 			g.Correcting(&g.OBot)
@@ -110,6 +118,7 @@ func (g *GameField) StepHuman() {
 	} else {
 		g.MoveHuman()
 		if g.StepRes != 0 {
+			g.Correcting(&g.OBot)
 			g.NStep = 0
 			return
 		}
@@ -124,7 +133,13 @@ func (g *GameField) StepRandom() {
 		g.XO = XO0
 	}
 
-	if g.NStep%2 == 1 {
+	if g.NStep%2 == g.OBot.core%2 && g.NStep == 0 {
+		g.RandomMove(&g.OBot)
+		g.NStep++
+		return
+	}
+
+	if g.NStep%2 == g.OBot.core%2 {
 		g.Move(&g.OBot)
 		if g.StepRes != 0 {
 			g.Correcting(&g.OBot)
@@ -285,23 +300,11 @@ func PrintXO(Field [9]float64) {
 	fmt.Println("\n")
 }
 
-func (g *GameField) CorrectByzy(bot *Bot) {
-	g.XA = make([]float64, 1)
-	if g.NoMove() {
-		log.Fatal("CorrectByzy: ИИ некуда ходить.")
-	}
-
-	g.XA[0] = 0
-	bot.NeuralNet.SetAnswers(g.XA)
-	bot.NeuralNet.Correct()
-	bot.Byzy++
-}
-
 func (g *GameField) CorrectLose(bot *Bot) {
 	g.XA = make([]float64, 1)
 	g.XA[0] = 0
 
-	for h := 1; h <= g.NStep; h += 2 {
+	for h := g.OBot.core % 2; h <= g.NStep; h += 2 {
 		for n := 0; n < 9; n++ {
 			bot.NeuralNet.Layers[0][n].Out = g.History[h].XO[n]
 		}
@@ -316,9 +319,9 @@ func (g *GameField) CorrectLose(bot *Bot) {
 
 func (g *GameField) CorrectWin(bot *Bot) {
 	g.XA = make([]float64, 1)
-	g.XA[0] = 1
+	g.XA[0] = 0.51
 
-	for h := 1; h <= g.NStep; h += 2 {
+	for h := g.OBot.core % 2; h <= g.NStep; h += 2 {
 		for n := 0; n < 9; n++ {
 			bot.NeuralNet.Layers[0][n].Out = g.History[h].XO[n]
 		}
@@ -334,7 +337,7 @@ func (g *GameField) CorrectDraw(bot *Bot) {
 	g.XA = make([]float64, 1)
 	g.XA[0] = 0.5
 
-	for h := 1; h <= g.NStep; h += 2 {
+	for h := g.OBot.core % 2; h <= g.NStep; h += 2 {
 		for n := 0; n < 9; n++ {
 			bot.NeuralNet.Layers[0][n].Out = g.History[h].XO[n]
 		}
@@ -347,9 +350,6 @@ func (g *GameField) CorrectDraw(bot *Bot) {
 }
 
 func (g *GameField) Correcting(bot *Bot) {
-	if g.StepRes == 201 {
-		log.Fatal("Correcting: Ход на занятую клетку")
-	}
 	if g.StepRes == 1 {
 		g.CorrectLose(bot)
 	}
