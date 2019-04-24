@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	DefCorrect = 0.2
+	DefCorrect = 0.15
 	Cores      = 2
 )
 
@@ -57,7 +57,7 @@ func main() {
 }
 
 func RandomBattle(core int) {
-	for r := 0; r < 100; r++ {
+	for r := 0; r < 200; r++ {
 		for n := 0; n < 1000; n++ {
 			for {
 				g[core].StepRandom()

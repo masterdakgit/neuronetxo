@@ -9,8 +9,11 @@ import (
 )
 
 const (
-	xx = -1
-	oo = 1
+	xx        = -1
+	oo        = 1
+	scoreWin  = 0.51
+	scoreDraw = 0.5
+	scoreLose = 0
 )
 
 var (
@@ -302,7 +305,7 @@ func PrintXO(Field [9]float64) {
 
 func (g *GameField) CorrectLose(bot *Bot) {
 	g.XA = make([]float64, 1)
-	g.XA[0] = 0
+	g.XA[0] = scoreLose
 
 	for h := g.OBot.core % 2; h <= g.NStep; h += 2 {
 		for n := 0; n < 9; n++ {
@@ -319,7 +322,7 @@ func (g *GameField) CorrectLose(bot *Bot) {
 
 func (g *GameField) CorrectWin(bot *Bot) {
 	g.XA = make([]float64, 1)
-	g.XA[0] = 1
+	g.XA[0] = scoreWin
 
 	for h := g.OBot.core % 2; h <= g.NStep; h += 2 {
 		for n := 0; n < 9; n++ {
@@ -335,7 +338,7 @@ func (g *GameField) CorrectWin(bot *Bot) {
 
 func (g *GameField) CorrectDraw(bot *Bot) {
 	g.XA = make([]float64, 1)
-	g.XA[0] = 0.5
+	g.XA[0] = scoreDraw
 
 	for h := g.OBot.core % 2; h <= g.NStep; h += 2 {
 		for n := 0; n < 9; n++ {
