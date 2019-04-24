@@ -8,29 +8,39 @@ import (
 )
 
 const (
-	DefCorrect = 0.15
+	DefCorrect = 0.3
+	Cores      = 4
 )
 
 var (
-	g GameField
+	g     [Cores]GameField
+	rscan int
 )
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	g.Prepare([]int{9, 36, 36, 36, 9}, DefCorrect)
+	for core := 0; core < Cores; core++ {
+		g[core].Prepare([]int{9, 57, 3, 1}, DefCorrect)
+		go RandomBattle(core)
+	}
+	fmt.Scanln(&rscan)
+}
 
+func RandomBattle(core int) {
 	for {
 		for n := 0; n < 10000; n++ {
-			g.Step()
+			g[core].StepRandom()
 		}
-		fmt.Println("Byzy:", g.OBot.Byzy, g.XBot.Byzy, "Lose:", g.OBot.Lose, g.XBot.Lose)
-		if g.XBot.Lose == 0 && g.OBot.Lose == 0 {
+
+		fmt.Println("Core:", core, "OLose:", g[core].OBot.Lose, "Win:", g[core].OBot.Win)
+		if g[core].OBot.Lose == 0 {
 			break
 		}
-		g.XBot.Byzy = 0
-		g.XBot.Lose = 0
-		g.OBot.Byzy = 0
-		g.OBot.Lose = 0
+		g[core].OBot.Lose = 0
+		g[core].OBot.Win = 0
 	}
-
+	for {
+		fmt.Println("Core: ", core, " - найдено решение.")
+		time.Sleep(2000000000)
+	}
 }

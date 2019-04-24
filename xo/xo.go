@@ -17,27 +17,25 @@ var (
 	XO0 [9]float64
 )
 
-type HistoryMove struct {
-	XO        [9]float64
-	Move      int
-	EnemyMove int
+type HistoryXO struct {
+	XO       [9]float64
+	LastMove int
 }
 
 type GameField struct {
-	XA         []float64
-	Layers     []int
-	XO         [9]float64
-	XBot, OBot Bot
-	xoLast     float64
-	movLast    int
-	StepRes    int
-	NStep      int
+	XA                []float64
+	Layers            []int
+	XO                [9]float64
+	XBot, OBot, Human Bot
+	xoLast            float64
+	movLast           int
+	StepRes           int
+	NStep             int
+	History           [9]HistoryXO
 }
 
 type Bot struct {
 	NeuralNet             nr.NeuroNet
-	History               [5]HistoryMove
-	NHistory              int
 	Lose, Win, Byzy, Draw int
 	LastMove              int
 	xo                    float64
@@ -49,6 +47,10 @@ func (game *GameField) Prepare(L []int, defCorrect float64) {
 	game.XBot.NeuralNet.CreateLayer(L)
 	game.XBot.NeuralNet.NCorrect = defCorrect
 	game.XBot.xo = xx
+
+	game.Human.NeuralNet.CreateLayer(L)
+	game.Human.NeuralNet.NCorrect = defCorrect
+	game.Human.xo = xx
 
 	game.OBot.NeuralNet.CreateLayer(L)
 	game.OBot.NeuralNet.NCorrect = defCorrect
@@ -69,7 +71,6 @@ func (g *GameField) RandomMove(bot *Bot) {
 	}
 	bot.LastMove = r
 	g.step(bot)
-	g.NStep++
 
 }
 
@@ -83,28 +84,58 @@ func (g *GameField) NoMove() bool {
 	return NoMove
 }
 
-func (g *GameField) Step() {
+func (g *GameField) MoveHuman() {
+	r := 0
+	fmt.Print("Ваш ход: ")
+	fmt.Scanln(&r)
+	g.Human.LastMove = r
+	g.step(&g.Human)
+}
+
+func (g *GameField) StepHuman() {
 	g.StepRes = 0
 
 	if g.NStep == 0 {
 		g.XO = XO0
-		g.RandomMove(&g.XBot)
-		g.NStep++
-		return
 	}
-	if g.NStep%2 == 1 {
 
+	if g.NStep%2 == 1 {
 		g.Move(&g.OBot)
 		if g.StepRes != 0 {
-			g.Correcting(&g.OBot, &g.XBot)
+			g.Correcting(&g.OBot)
 			g.NStep = 0
 			return
 		}
 
 	} else {
-		g.Move(&g.XBot)
+		g.MoveHuman()
 		if g.StepRes != 0 {
-			g.Correcting(&g.XBot, &g.OBot)
+			g.NStep = 0
+			return
+		}
+	}
+	g.NStep++
+}
+
+func (g *GameField) StepRandom() {
+	g.StepRes = 0
+
+	if g.NStep == 0 {
+		g.XO = XO0
+	}
+
+	if g.NStep%2 == 1 {
+		g.Move(&g.OBot)
+		if g.StepRes != 0 {
+			g.Correcting(&g.OBot)
+			g.NStep = 0
+			return
+		}
+
+	} else {
+		g.RandomMove(&g.XBot)
+		if g.StepRes != 0 {
+			g.Correcting(&g.OBot)
 			g.NStep = 0
 			return
 		}
@@ -205,21 +236,44 @@ func (g *GameField) Winer(w float64) bool {
 }
 
 func (g *GameField) Move(bot *Bot) {
-	for n := 0; n < 9; n++ {
-		bot.NeuralNet.Layers[0][n].Out = g.XO[n]
-	}
-	bot.NeuralNet.Calc()
-	bot.LastMove = bot.NeuralNet.MaxOutputNumber()
-	g.step(bot)
+	max := float64(0)
+	lm := 0
+	var tempXO [9]float64
+	tempXO = g.XO
 
+	if g.NoMove() {
+		log.Fatal("Move: ИИ некуда ходить.")
+	}
+
+	for b := 0; b < 9; b++ {
+		g.XO = tempXO
+		if g.XO[b] != 0 {
+			continue
+		}
+		g.XO[b] = 1
+		for n := 0; n < 9; n++ {
+			bot.NeuralNet.Layers[0][n].Out = g.XO[n]
+		}
+		bot.NeuralNet.Calc()
+
+		if max < bot.NeuralNet.MaxOutputFloat(0) {
+			max = bot.NeuralNet.MaxOutputFloat(0)
+			lm = b
+			g.History[g.NStep].XO = g.XO
+		}
+	}
+	g.XO = tempXO
+	bot.LastMove = lm
+	g.History[g.NStep].LastMove = lm
+	g.step(bot)
 }
 
-func (g *GameField) PrintXO() {
+func PrintXO(Field [9]float64) {
 	for n := 0; n < 9; n++ {
 		if n%3 == 0 {
 			fmt.Println()
 		}
-		switch g.XO[n] {
+		switch Field[n] {
 		case 0:
 			fmt.Print(". ")
 		case xx:
@@ -232,70 +286,78 @@ func (g *GameField) PrintXO() {
 }
 
 func (g *GameField) CorrectByzy(bot *Bot) {
-	g.XA = make([]float64, 9)
+	g.XA = make([]float64, 1)
 	if g.NoMove() {
 		log.Fatal("CorrectByzy: ИИ некуда ходить.")
 	}
-	for n := 0; n < 9; n++ {
-		if g.XO[n] == 0 {
-			g.XA[n] = 1
-		} else {
-			g.XA[n] = 0
-		}
-	}
+
+	g.XA[0] = 0
 	bot.NeuralNet.SetAnswers(g.XA)
 	bot.NeuralNet.Correct()
 	bot.Byzy++
 }
 
-func (g *GameField) CorrectLose(my, enymy *Bot) {
-	g.XA = make([]float64, 9)
-	for n := 0; n < 9; n++ {
-		g.XA[n] = my.NeuralNet.Layers[len(g.Layers)-1][n].Out
+func (g *GameField) CorrectLose(bot *Bot) {
+	g.XA = make([]float64, 1)
+	g.XA[0] = 0
+
+	for h := 1; h <= g.NStep; h += 2 {
+		for n := 0; n < 9; n++ {
+			bot.NeuralNet.Layers[0][n].Out = g.History[h].XO[n]
+		}
+
+		bot.NeuralNet.Calc()
+		bot.NeuralNet.SetAnswers(g.XA)
+		bot.NeuralNet.Correct()
+
 	}
-	g.XA[my.LastMove] = 0
-	g.XA[enymy.LastMove] = 1
-	my.NeuralNet.SetAnswers(g.XA)
-	my.NeuralNet.Correct()
-	my.Lose++
+	bot.Lose++
 }
 
 func (g *GameField) CorrectWin(bot *Bot) {
-	g.XA = make([]float64, 9)
-	for n := 0; n < 9; n++ {
-		g.XA[n] = bot.NeuralNet.Layers[len(g.Layers)-1][n].Out
+	g.XA = make([]float64, 1)
+	g.XA[0] = 1
+
+	for h := 1; h <= g.NStep; h += 2 {
+		for n := 0; n < 9; n++ {
+			bot.NeuralNet.Layers[0][n].Out = g.History[h].XO[n]
+		}
+		bot.NeuralNet.Calc()
+		bot.NeuralNet.SetAnswers(g.XA)
+		bot.NeuralNet.Correct()
 	}
-	g.XA[bot.LastMove] = 1
-	bot.NeuralNet.SetAnswers(g.XA)
-	bot.NeuralNet.Correct()
+
 	bot.Win++
 }
 
 func (g *GameField) CorrectDraw(bot *Bot) {
-	g.XA = make([]float64, 9)
-	for n := 0; n < 9; n++ {
-		g.XA[n] = bot.NeuralNet.Layers[len(g.Layers)-1][n].Out
+	g.XA = make([]float64, 1)
+	g.XA[0] = 0.5
+
+	for h := 1; h <= g.NStep; h += 2 {
+		for n := 0; n < 9; n++ {
+			bot.NeuralNet.Layers[0][n].Out = g.History[h].XO[n]
+		}
+		bot.NeuralNet.Calc()
+		bot.NeuralNet.SetAnswers(g.XA)
+		bot.NeuralNet.Correct()
 	}
-	g.XA[bot.LastMove] = 0.5
-	bot.NeuralNet.SetAnswers(g.XA)
-	bot.NeuralNet.Correct()
+
 	bot.Draw++
 }
 
-func (g *GameField) Correcting(my, enymy *Bot) {
+func (g *GameField) Correcting(bot *Bot) {
 	if g.StepRes == 201 {
-		g.CorrectByzy(my)
+		log.Fatal("Correcting: Ход на занятую клетку")
 	}
 	if g.StepRes == 1 {
-		g.CorrectLose(enymy, my)
-		g.CorrectWin(my)
+		g.CorrectLose(bot)
 	}
 	if g.StepRes == 2 {
-		g.CorrectLose(enymy, my)
-		g.CorrectWin(my)
+		g.CorrectWin(bot)
 	}
 	if g.StepRes == 3 {
-		g.CorrectDraw(my)
+		g.CorrectDraw(bot)
 	}
 }
 
