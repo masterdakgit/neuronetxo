@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	DefCorrect = 0.3
+	DefCorrect = 0.2
 	Cores      = 2
 )
 
